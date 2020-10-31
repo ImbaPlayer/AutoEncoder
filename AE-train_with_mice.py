@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from sklearn.metrics import classification_report,confusion_matrix
 
-model_path = "save_model/ele_train/Autoencoder_anomaly_adam_lr0001.pt"
+model_path = "save_model/mice_train/Autoencoder_anomaly_adam_lr0001.pt"
 # label_file = "data/dec-test.csv"
 # data_file = "data/bin-test.csv"
 label_file = "/data/sym/one-class-svm/data/mean_of_five/dec-feature/caida-A-50W-5-0.csv"
@@ -77,47 +77,20 @@ class MNISTAnomalyDataset(Dataset):
 
         return torch.FloatTensor(sample)
 
-def create_dataset(data, targets, contam=0.01):
-    regIdxs = np.where(targets == 0)[0]
-    anomalyIdxs = np.where(targets == 1)[0]
-
-    # randomly shuffle
-    np.random.seed(10)
-    np.random.shuffle(regIdxs)
-    np.random.shuffle(anomalyIdxs)
-
-    # compute anomaly number
-    i = int(len(regIdxs) * contam)
-    anomalyIdxs = anomalyIdxs[:i]
-
-    regData = data[regIdxs]
-    anomalyData = data[anomalyIdxs]
-
-    print("stack")
-    print(regData.shape)
-    print(anomalyData.shape)
-
-    # stack
-    data = np.vstack([regData, anomalyData])
-    np.random.seed(10)
-    # shuffle final data
-    np.random.shuffle(data)
-    return data
-
 def preprocess():
     
     label = pd.read_csv(label_file)
     data = pd.read_csv(data_file)
     
     # get label
-    thresh = 500
+    thresh = 2000
     label = label["flowSize"]
     targets = label.copy(deep=True)
-    # binary labels (0: inliers, 1: outliers)
-    targets[label > thresh] = 0
-    targets[label <= thresh] = 1
-    print("original mice count: ", sum(targets==1))
-    print("original elephant count: ", sum(targets==0))
+    # binary labels (0: inliers, 1: outliers) (0: mice, 1: elephant)
+    targets[label > thresh] = 1
+    targets[label <= thresh] = 0
+    print("original mice count: ", sum(targets==0))
+    print("original elephant count: ", sum(targets==1))
 
     # split into train and test
     X_train, X_test, y_train, y_test = train_test_split(data, targets, test_size=0.2, random_state=10)
@@ -126,19 +99,19 @@ def preprocess():
     # data_numpy = data.values
     # targets_numpy = targets.values
 
-    # total_data = create_dataset(data_numpy, targets_numpy, 0.1)
-    # print(total_data.shape)
     return X_train, X_test, y_train, y_test
 
 def load_data():
    
     X_train, X_test, y_train, y_test = preprocess()
     # split train to ele and mice
-    X_train_ele = X_train[y_train == 0]
-    X_train_mice = X_train[y_train == 1]
+    X_train_ele = X_train[y_train == 1]
+    X_train_mice = X_train[y_train == 0]
     print("train ele", X_train_ele.shape[0])
     print("train mice", X_train_mice.shape[0])
-    total_data = X_train_ele.values
+
+    # use mice to train the model
+    total_data = X_train_mice.values
     total_data[total_data=='0'] = -1
     total_data[total_data=='1'] = 1
     X_train, X_valid = train_test_split(total_data, test_size=0.2,random_state=10)
@@ -212,13 +185,14 @@ def detect_anomalies(unsupervised_images, decoded_outputs, y_test, quantile=0.8)
         mse = np.mean((inputing - outputing)**2)
         errors.append(mse)
     quantile = sum(y_test==0) / unsupervised_images.shape[0]
+    quantile = 0.72
     print("quantile", quantile)
     thresh = np.quantile(errors, quantile)
     idxs = np.where(np.array(errors) >= thresh)[0]
     print("mse threshold: {}".format(thresh))
     print("{} outliers found".format(len(idxs)))
-    print("test mice count: ", sum(y_test==1))
-    print("test elephant count: ", sum(y_test==0))
+    print("test mice count: ", sum(y_test==0))
+    print("test elephant count: ", sum(y_test==1))
 
     y_predict = np.zeros(unsupervised_images.shape[0])
     y_predict[idxs] = 1
