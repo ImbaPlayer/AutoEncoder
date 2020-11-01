@@ -36,3 +36,17 @@ https://github.com/Tamim-MR14/Unsupervised_Anomaly_Detection_Using_Convolutional
 https://github.com/Chuck2Win/variational-autoencoder-based-anomaly-detection-using-reconstruction-probability/blob/master/Variational%20Autoencoder%20based%20Anomaly%20Detection%20using%20Reconstruction%20Probability.ipynb
 ```
 
+VAE
+
+```
+https://blog.csdn.net/fengdu78/article/details/104337519
+https://blog.csdn.net/huangqihao723/article/details/105522683
+https://blog.csdn.net/z_feng12489/article/details/88851163
+```
+
+total
+
+```
+https://github.com/Tamim-MR14/Unsupervised_Anomaly_Detection_Using_Convolutional_Autoencoder_Pytorch/blob/master/Unsupervised_Anomaly_Detection_Using_Convolutional_AutoEncoders.ipynb
+```
+

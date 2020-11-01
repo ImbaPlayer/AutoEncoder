@@ -1,0 +1,97 @@
+# 压缩
+        self.encoder = nn.Sequential(
+            nn.Linear(387, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 12),
+            nn.ReLU(),
+            nn.Linear(12, 3),
+        )
+        # 解压
+        self.decoder = nn.Sequential(
+            nn.Linear(3, 12),
+            nn.ReLU(),
+            nn.Linear(12, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 387),
+            nn.Sigmoid(),       # 激励函数让输出值在 (0, 1)
+        )
+ReLU 500: relu-500
+ReLU 2000: relu-2000
+
+layers 2:
+# 压缩
+        self.encoder = nn.Sequential(
+            nn.Linear(387, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, 20),
+            # nn.ReLU(),
+            # nn.Linear(12, 3),
+        )
+        # 解压
+        self.decoder = nn.Sequential(
+            # nn.Linear(3, 12),
+            # nn.ReLU(),
+            nn.Linear(20, 64),
+            nn.ReLU(),
+            nn.Linear(64, 256),
+            nn.ReLU(),
+            nn.Linear(256, 387),
+            nn.Sigmoid(),       # 激励函数让输出值在 (0, 1)
+        )
+epoch 50
+500: 2-relu-500
+2000: 2-relu-2000
+
+layers 3:
+# 压缩
+        self.encoder = nn.Sequential(
+            nn.Linear(387, 128),
+            nn.ReLU(),
+            nn.Linear(128, 20),
+            # nn.ReLU(),
+            # nn.Linear(64, 20),
+            # nn.ReLU(),
+            # nn.Linear(12, 3),
+        )
+        # 解压
+        self.decoder = nn.Sequential(
+            # nn.Linear(3, 12),
+            # nn.ReLU(),
+            # nn.Linear(20, 64),
+            # nn.ReLU(),
+            nn.Linear(20, 128),
+            nn.ReLU(),
+            nn.Linear(128, 387),
+            nn.Sigmoid(),       # 激励函数让输出值在 (0, 1)
+        )
+epoch 70:
+500: 3-relu-500
+
+layer 4:
+# 压缩
+        self.encoder = nn.Sequential(
+            nn.Linear(387, 20),
+            # nn.ReLU(),
+            # nn.Linear(128, 20),
+            # nn.ReLU(),
+            # nn.Linear(64, 20),
+            # nn.ReLU(),
+            # nn.Linear(12, 3),
+        )
+        # 解压
+        self.decoder = nn.Sequential(
+            # nn.Linear(3, 12),
+            # nn.ReLU(),
+            # nn.Linear(20, 64),
+            # nn.ReLU(),
+            # nn.Linear(20, 128),
+            # nn.ReLU(),
+            nn.Linear(20, 387),
+            nn.Sigmoid(),       # 激励函数让输出值在 (0, 1)
+        )
