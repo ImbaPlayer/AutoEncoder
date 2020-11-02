@@ -13,15 +13,17 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from sklearn.metrics import classification_report,confusion_matrix
 
-model_path = "save_model/mice_train/Autoencoder_anomaly_adam_lr0001.pt"
-label_file = "data/dec-test.csv"
-data_file = "data/bin-test.csv"
-# label_file = "/data/sym/one-class-svm/data/mean_of_five/dec-feature/caida-A-50W-5-0.csv"
-# data_file = "/data/sym/one-class-svm/data/mean_of_five/bin-feature/caida-A-50W-5-0.csv"
+model_path = "/data/sym/anomaly_detection/AutoEncoder/save_model/change_thre/mice_train/Autoencoder_adam_lr0001.pt"
+# model_path = "../save_model/test.pt"
+# label_file = "../data/dec-test.csv"
+# data_file = "../data/bin-test.csv"
+label_file = "/data/sym/one-class-svm/data/mean_of_five/dec-feature/caida-A-50W-5-0.csv"
+data_file = "/data/sym/one-class-svm/data/mean_of_five/bin-feature/caida-A-50W-5-0.csv"
 # nodes = 387
-thresh = 200
-n_epochs = 50
-
+thresh = 500
+n_epochs = 1
+batch_size = 1
+max_train_loss = 0.0
 
 
 class AutoEncoder(nn.Module):
@@ -42,7 +44,7 @@ class AutoEncoder(nn.Module):
         self.decoder = nn.Sequential(
             # nn.Linear(3, 12),
             # nn.ReLU(),
-            nn.Linear(10, 64),
+            nn.Linear(20, 64),
             nn.ReLU(),
             nn.Linear(64, 256),
             nn.ReLU(),
@@ -51,26 +53,9 @@ class AutoEncoder(nn.Module):
         )
  
     def forward(self, x):
-        batchsz = x.size(0)
-        q = self.encoder(x)
-        mu, sigma = q.chunk(2, dim=1)
-        # reparameterize trick, eqsilon~N(0,1)
-        q = mu + sigma * torch.randn_like(sigma)
-
-        # decoder
-        x_hat = self.decoder(q)
-        # print("x_hat", x_hat.size())
-        # KL
-        kld = 0.5 * torch.sum(
-            torch.pow(mu, 2) +
-            torch.pow(sigma, 2) - 
-            torch.log(1e-8 + torch.pow(sigma, 2)) - 1
-        ) / (batchsz * 387)
-        return x_hat, kld
-
-        # encoded = self.encoder(x)
-        # decoded = self.decoder(encoded)
-        # return decoded
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
 
 class MNISTAnomalyDataset(Dataset):
     """Face Landmarks dataset."""
@@ -78,6 +63,8 @@ class MNISTAnomalyDataset(Dataset):
     def __init__(self, X, transform=None):
         """
         Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the images.
             transform (callabel, optional): Optional transform to be applied
                 on a sample.
         """
@@ -145,13 +132,14 @@ def load_data():
 
     loaders = {}
 
-    batch_size=32
+    
 
     loaders['train'] = torch.utils.data.DataLoader(data['train'], batch_size=32, num_workers=0, shuffle=True)
     loaders['valid'] = torch.utils.data.DataLoader(data['valid'], batch_size=32, num_workers=0)
     return loaders
 
 def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
+    global max_train_loss
     valid_loss_min = np.Inf
     train_loss_list = []
     valid_loss_list = []
@@ -166,25 +154,14 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
             # move to GPU
             if use_cuda:
                 data = data.cuda()
-            
-            output, kld = model.forward(data)
-            print("data", data.size())
-            print("output", output.size())
-            print("output type", type(output))
-            print("data type", type(data))
-            loss = criterion(output, output)
-
-            if kld is not None:
-                elbo = loss + 1.0 * kld
-                loss = elbo
-
-            # output = model.forward(data)
-            # print("data", data.size())
-            # print("output", output.size())
-            # loss = criterion(output, data)
-            
-            # backprop
             optimizer.zero_grad()
+            output = model.forward(data)
+            loss = criterion(output, data)
+
+            temp_loss = loss.cpu().detach().numpy()
+            if temp_loss > max_train_loss:
+                max_train_loss = temp_loss
+
             loss.backward()
             optimizer.step()
 
@@ -200,6 +177,7 @@ def train(n_epochs, loaders, model, optimizer, criterion, use_cuda, save_path):
                 # update the average validation loss
                 output = model.forward(data)
                 loss = criterion(output, data)
+                
                 valid_loss = valid_loss + ((1 / (batch_idx + 1)) * (loss.data - valid_loss))
         print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(epoch, train_loss, valid_loss))
 
@@ -223,11 +201,18 @@ def detect_anomalies(unsupervised_images, decoded_outputs, y_test, quantile=0.8)
     quantile = 0.72
     print("quantile", quantile)
     thresh = np.quantile(errors, quantile)
+    print("caculate thresh", thresh)
+    print("max train loss", max_train_loss)
+    # thresh = max_train_loss * max_train_loss
     idxs = np.where(np.array(errors) >= thresh)[0]
     print("mse threshold: {}".format(thresh))
     print("{} outliers found".format(len(idxs)))
     print("test mice count: ", sum(y_test==0))
     print("test elephant count: ", sum(y_test==1))
+
+    print("errors mean", np.mean(errors))
+    print("errors max", np.max(errors))
+    print("errors min", np.min(errors))
 
     y_predict = np.zeros(unsupervised_images.shape[0])
     y_predict[idxs] = 1
@@ -268,7 +253,7 @@ def main():
         model = autoencoder.cuda()
     print(autoencoder)
     # specify loss function
-    criterion = nn.MSELoss()
+    criterion = nn.MSELoss(reduce=True, size_average=True)
 
     # specify loss function
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.001)
